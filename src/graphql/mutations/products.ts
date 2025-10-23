@@ -1,0 +1,45 @@
+import { gql } from '@apollo/client';
+
+/**
+ * Mutation to create a new product
+ * Product will be created in DynamoDB first, then synced to Shopify
+ */
+export const CREATE_PRODUCT = gql`
+  mutation CreateProduct($shopDomain: String!, $input: CreateProductInput!) {
+    createProduct(shopDomain: $shopDomain, input: $input) {
+      id
+      shopifyId
+      title
+      status
+      syncStatus
+      createdAt
+    }
+  }
+`;
+
+/**
+ * Mutation to update an existing product
+ */
+export const UPDATE_PRODUCT = gql`
+  mutation UpdateProduct($shopDomain: String!, $shopifyId: String!, $input: UpdateProductInput!) {
+    updateProduct(shopDomain: $shopDomain, shopifyId: $shopifyId, input: $input) {
+      id
+      shopifyId
+      title
+      status
+      syncStatus
+      updatedAt
+    }
+  }
+`;
+
+/**
+ * Mutation to delete a product
+ * Removes from both DynamoDB and Shopify
+ */
+export const DELETE_PRODUCT = gql`
+  mutation DeleteProduct($shopDomain: String!, $shopifyId: String!) {
+    deleteProduct(shopDomain: $shopDomain, shopifyId: $shopifyId)
+  }
+`;
+
