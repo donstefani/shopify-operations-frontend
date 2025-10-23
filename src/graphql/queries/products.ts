@@ -1,10 +1,8 @@
-import { gql } from '@apollo/client';
-
 /**
  * Query to get product statistics
  * This is the simplest query - great for testing!
  */
-export const GET_PRODUCT_STATS = gql`
+export const GET_PRODUCT_STATS = `
   query GetProductStats($shopDomain: String!) {
     productStats(shopDomain: $shopDomain) {
       total
@@ -20,7 +18,7 @@ export const GET_PRODUCT_STATS = gql`
 /**
  * Query to get a list of products with pagination
  */
-export const GET_PRODUCTS = gql`
+export const GET_PRODUCTS = `
   query GetProducts($shopDomain: String!, $limit: Int, $cursor: String, $filters: ProductFilters) {
     products(shopDomain: $shopDomain, limit: $limit, cursor: $cursor, filters: $filters) {
       items {
@@ -49,7 +47,7 @@ export const GET_PRODUCTS = gql`
 /**
  * Query to get a single product by ID
  */
-export const GET_PRODUCT = gql`
+export const GET_PRODUCT = `
   query GetProduct($shopDomain: String!, $shopifyId: String!) {
     product(shopDomain: $shopDomain, shopifyId: $shopifyId) {
       id

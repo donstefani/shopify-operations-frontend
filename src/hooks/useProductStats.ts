@@ -1,33 +1,44 @@
-import { useQuery } from '@apollo/client';
-import { GET_PRODUCT_STATS } from '../graphql/queries/products';
-import { productClient } from '../lib/apollo-client';
-import { SHOP_DOMAIN } from '../lib/constants';
+import { useState, useEffect } from 'react';
+import { productClient, GET_PRODUCT_STATS } from '../lib/graphql-client';
 
-/**
- * Hook to fetch product statistics
- * 
- * Usage:
- *   const { stats, loading, error } = useProductStats();
- * 
- * Returns:
- *   - stats: { total, byStatus: { active, draft, archived } }
- *   - loading: boolean (true while fetching)
- *   - error: Error object if request failed
- */
-export function useProductStats() {
-  const { data, loading, error } = useQuery(GET_PRODUCT_STATS, {
-    client: productClient,
-    variables: {
-      shopDomain: SHOP_DOMAIN,
-    },
-    // Automatically refetch every 30 seconds for real-time updates
-    pollInterval: 30000,
-  });
-
-  return {
-    stats: data?.productStats,
-    loading,
-    error,
+interface ProductStats {
+  total: number;
+  byStatus: {
+    active: number;
+    draft: number;
+    archived: number;
   };
 }
 
+export const useProductStats = (shopDomain: string) => {
+  const [data, setData] = useState<ProductStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const result = await productClient.request<{ productStats: ProductStats }>(
+          GET_PRODUCT_STATS,
+          { shopDomain }
+        );
+        
+        setData(result.productStats);
+      } catch (err) {
+        console.error('Error fetching product stats:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch product stats');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (shopDomain) {
+      fetchStats();
+    }
+  }, [shopDomain]);
+
+  return { data, loading, error };
+};

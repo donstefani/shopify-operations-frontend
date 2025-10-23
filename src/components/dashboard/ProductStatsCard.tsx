@@ -10,7 +10,7 @@ import { useProductStats } from '@/hooks/useProductStats';
  * 4. How to display the data
  */
 export function ProductStatsCard() {
-  const { stats, loading, error } = useProductStats();
+  const { data: stats, loading, error } = useProductStats('don-stefani-demo-store.myshopify.com');
 
   // While data is being fetched, show a loading state
   if (loading) {
@@ -27,7 +27,7 @@ export function ProductStatsCard() {
     return (
       <div className="p-6 bg-card border rounded-lg shadow-sm border-destructive">
         <p className="text-sm font-medium text-destructive">Error Loading Products</p>
-        <p className="text-xs text-muted-foreground mt-1">{error.message}</p>
+        <p className="text-xs text-muted-foreground mt-1">{error}</p>
       </div>
     );
   }
