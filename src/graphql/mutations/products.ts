@@ -41,3 +41,25 @@ export const DELETE_PRODUCT = `
   }
 `;
 
+/**
+ * Mutation to sync all products from Shopify to database
+ * This is used for initial import or full resync
+ */
+export const SYNC_ALL_PRODUCTS = `
+  mutation SyncAllProducts($shopDomain: String!) {
+    syncAllProducts(shopDomain: $shopDomain) {
+      success
+      message
+      imported
+      updated
+      errors
+      details {
+        action
+        shopifyId
+        title
+        error
+      }
+    }
+  }
+`;
+
