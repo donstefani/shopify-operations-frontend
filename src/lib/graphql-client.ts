@@ -44,11 +44,34 @@ export const GET_ORDER_STATS = `
   query GetOrderStats($shopDomain: String!) {
     orderStats(shopDomain: $shopDomain) {
       total
+      totalRevenue
       byStatus {
-        open
-        closed
+        pending
+        paid
+        fulfilled
         cancelled
       }
+    }
+  }
+`;
+
+export const GET_ORDERS = `
+  query GetOrders($shopDomain: String!, $limit: Int) {
+    orders(shopDomain: $shopDomain, limit: $limit) {
+      items {
+        id
+        shopifyId
+        orderNumber
+        customerEmail
+        totalPrice
+        currency
+        status
+        fulfillmentStatus
+        financialStatus
+        createdAt
+        updatedAt
+      }
+      totalCount
     }
   }
 `;
