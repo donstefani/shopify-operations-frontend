@@ -30,6 +30,10 @@ export interface UseCustomersOptions {
   autoRefresh?: boolean;
   /** Polling interval for auto-refresh (default: 30000ms = 30 seconds) */
   pollInterval?: number;
+  /** Limit for number of customers to fetch */
+  limit?: number;
+  /** Cursor for pagination */
+  cursor?: string | null;
 }
 
 export interface UseCustomersReturn {
@@ -43,19 +47,36 @@ export interface UseCustomersReturn {
   refresh: () => Promise<void>;
   /** Last time data was fetched */
   lastFetched: Date | null;
+  /** Total count of customers */
+  totalCount: number;
+  /** Pagination info */
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
 }
 
 export function useCustomers(options: UseCustomersOptions = {}): UseCustomersReturn {
   const {
     shopDomain = SHOP_DOMAIN,
     autoRefresh = true,
-    pollInterval = 30000
+    pollInterval = 30000,
+    limit = 50,
+    cursor = null
   } = options;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [pageInfo, setPageInfo] = useState<{
+    hasNextPage: boolean;
+    endCursor: string | null;
+  }>({
+    hasNextPage: false,
+    endCursor: null
+  });
 
   /**
    * Fetch customers from the API
@@ -66,8 +87,8 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRet
       setError(null);
 
       const query = `
-        query GetCustomers($shopDomain: String!) {
-          customers(shopDomain: $shopDomain) {
+        query GetCustomers($shopDomain: String!, $limit: Int, $cursor: String) {
+          customers(shopDomain: $shopDomain, limit: $limit, cursor: $cursor) {
             items {
               id
               shopifyId
@@ -81,6 +102,10 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRet
               createdAt
               updatedAt
             }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             totalCount
           }
         }
@@ -88,6 +113,8 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRet
 
       const variables = {
         shopDomain,
+        limit,
+        cursor: cursor || undefined
       };
 
       const response = await customerClient.request(query, variables);
@@ -107,31 +134,16 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRet
       }));
 
       setCustomers(customers);
+      setTotalCount(response.customers.totalCount);
+      setPageInfo(response.customers.pageInfo || { hasNextPage: false, endCursor: null });
       setLastFetched(new Date());
     } catch (err) {
       console.error('Error fetching customers:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch customers');
-      // Fallback to mock data if the API fails
-      const mockCustomers: Customer[] = [
-        {
-          id: '1',
-          shopifyId: 'gid://shopify/Customer/123',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john.doe@example.com',
-          phone: '+1-555-0123',
-          totalSpent: '$129.99',
-          ordersCount: 3,
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ];
-      setCustomers(mockCustomers);
     } finally {
       setLoading(false);
     }
-  }, [shopDomain]);
+  }, [shopDomain, limit, cursor]);
 
   // Effect to fetch customers on mount
   useEffect(() => {
@@ -151,6 +163,8 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRet
     loading,
     error,
     refresh: fetchCustomers,
-    lastFetched
+    lastFetched,
+    totalCount,
+    pageInfo
   };
 }

@@ -27,6 +27,10 @@ export interface UseOrdersOptions {
   autoRefresh?: boolean;
   /** Polling interval for auto-refresh (default: 30000ms = 30 seconds) */
   pollInterval?: number;
+  /** Limit for number of orders to fetch */
+  limit?: number;
+  /** Cursor for pagination */
+  cursor?: string | null;
 }
 
 export interface UseOrdersReturn {
@@ -40,19 +44,36 @@ export interface UseOrdersReturn {
   refresh: () => Promise<void>;
   /** Last time data was fetched */
   lastFetched: Date | null;
+  /** Total count of orders */
+  totalCount: number;
+  /** Pagination info */
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
 }
 
 export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
   const {
     shopDomain = SHOP_DOMAIN,
     autoRefresh = true,
-    pollInterval = 30000
+    pollInterval = 30000,
+    limit = 50,
+    cursor = null
   } = options;
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [pageInfo, setPageInfo] = useState<{
+    hasNextPage: boolean;
+    endCursor: string | null;
+  }>({
+    hasNextPage: false,
+    endCursor: null
+  });
 
   /**
    * Fetch orders from the API
@@ -64,8 +85,8 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
 
       // GraphQL query to fetch orders
       const query = `
-        query GetOrders($shopDomain: String!, $limit: Int) {
-          orders(shopDomain: $shopDomain, limit: $limit) {
+        query GetOrders($shopDomain: String!, $limit: Int, $cursor: String) {
+          orders(shopDomain: $shopDomain, limit: $limit, cursor: $cursor) {
             items {
               id
               shopifyId
@@ -79,6 +100,10 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
               createdAt
               updatedAt
             }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             totalCount
           }
         }
@@ -86,7 +111,8 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
 
       const variables = {
         shopDomain,
-        limit: 50 // Fetch up to 50 orders
+        limit,
+        cursor: cursor || undefined
       };
 
       const response = await orderClient.request(query, variables);
@@ -104,29 +130,16 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
       }));
 
       setOrders(orders);
+      setTotalCount(response.orders.totalCount);
+      setPageInfo(response.orders.pageInfo || { hasNextPage: false, endCursor: null });
       setLastFetched(new Date());
     } catch (err) {
       console.error('Error fetching orders:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch orders');
-      
-      // Fallback to mock data if the API fails
-      const mockOrders: Order[] = [
-        {
-          id: '1',
-          shopifyId: 'gid://shopify/Order/123',
-          orderNumber: '#1001',
-          customerName: 'John Doe',
-          totalPrice: '$29.99',
-          status: 'paid',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ];
-      setOrders(mockOrders);
     } finally {
       setLoading(false);
     }
-  }, [shopDomain]);
+  }, [shopDomain, limit, cursor]);
 
   // Effect to fetch orders on mount
   useEffect(() => {
@@ -146,6 +159,8 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
     loading,
     error,
     refresh: fetchOrders,
-    lastFetched
+    lastFetched,
+    totalCount,
+    pageInfo
   };
 }
