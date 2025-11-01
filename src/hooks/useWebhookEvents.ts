@@ -27,6 +27,8 @@ export interface UseWebhookEventsOptions {
   autoStart?: boolean;
   /** Maximum number of events to fetch (default: 50) */
   limit?: number;
+  /** Cursor for pagination */
+  cursor?: string | null;
 }
 
 export interface UseWebhookEventsReturn {
@@ -48,6 +50,13 @@ export interface UseWebhookEventsReturn {
   stopPolling: () => void;
   /** Last time data was fetched */
   lastFetched: Date | null;
+  /** Total count of events (from stats) */
+  totalCount: number;
+  /** Pagination info */
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
 }
 
 export function useWebhookEvents(options: UseWebhookEventsOptions = {}): UseWebhookEventsReturn {
@@ -56,7 +65,8 @@ export function useWebhookEvents(options: UseWebhookEventsOptions = {}): UseWebh
     topic,
     pollInterval = 5000,
     autoStart = true,
-    limit = 50
+    limit = 50,
+    cursor = null
   } = options;
 
   const [events, setEvents] = useState<WebhookEvent[]>([]);
@@ -65,8 +75,16 @@ export function useWebhookEvents(options: UseWebhookEventsOptions = {}): UseWebh
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [pageInfo, setPageInfo] = useState<{
+    hasNextPage: boolean;
+    endCursor: string | null;
+  }>({
+    hasNextPage: false,
+    endCursor: null
+  });
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
 
   /**
@@ -81,19 +99,28 @@ export function useWebhookEvents(options: UseWebhookEventsOptions = {}): UseWebh
 
       // Fetch both events and stats in parallel
       const [eventsResponse, statsResponse] = await Promise.all([
-        eventClient.getWebhookEvents(shopDomain, { limit, topic }),
+        eventClient.getWebhookEvents(shopDomain, { limit, topic, cursor: cursor || undefined }),
         eventClient.getWebhookEventStats(shopDomain)
       ]);
 
       if (isMountedRef.current) {
         if (eventsResponse.success) {
           setEvents(eventsResponse.data);
+          // Use the last event ID as the cursor for next page
+          const lastEvent = eventsResponse.data.length > 0 
+            ? eventsResponse.data[eventsResponse.data.length - 1] 
+            : null;
+          setPageInfo({
+            hasNextPage: eventsResponse.pagination?.hasMore || false,
+            endCursor: lastEvent?.event_id || null
+          });
         } else {
           setError(eventsResponse.message || 'Failed to fetch webhook events');
         }
 
         if (statsResponse.success) {
           setStats(statsResponse.data);
+          setTotalCount(statsResponse.data.total || 0);
         } else {
           console.warn('Failed to fetch webhook stats:', statsResponse.message);
         }
@@ -110,7 +137,7 @@ export function useWebhookEvents(options: UseWebhookEventsOptions = {}): UseWebh
         setLoading(false);
       }
     }
-  }, [shopDomain, topic, limit]);
+  }, [shopDomain, topic, limit, cursor]);
 
   /**
    * Start polling for webhook events
@@ -177,7 +204,9 @@ export function useWebhookEvents(options: UseWebhookEventsOptions = {}): UseWebh
     refresh,
     startPolling,
     stopPolling,
-    lastFetched
+    lastFetched,
+    totalCount,
+    pageInfo
   };
 }
 
