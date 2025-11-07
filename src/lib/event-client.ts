@@ -52,8 +52,8 @@ class EventClient {
   private baseUrl: string;
 
   constructor() {
-    // Extract the base URL from the EVENT API URL (remove /graphql)
-    this.baseUrl = API_URLS.EVENT.replace('/graphql', '');
+    // Use the base URL directly (should not include /api/events)
+    this.baseUrl = API_URLS.EVENT;
   }
 
   /**
@@ -81,7 +81,8 @@ class EventClient {
       },
     });
 
-    if (!response.ok) {
+    // 304 (Not Modified) is a successful cached response, should be treated as ok
+    if (!response.ok && response.status !== 304) {
       throw new Error(`Failed to fetch webhook events: ${response.statusText}`);
     }
 
@@ -103,7 +104,8 @@ class EventClient {
       },
     });
 
-    if (!response.ok) {
+    // 304 (Not Modified) is a successful cached response, should be treated as ok
+    if (!response.ok && response.status !== 304) {
       throw new Error(`Failed to fetch webhook event stats: ${response.statusText}`);
     }
 
@@ -125,7 +127,8 @@ class EventClient {
       },
     });
 
-    if (!response.ok) {
+    // 304 (Not Modified) is a successful cached response, should be treated as ok
+    if (!response.ok && response.status !== 304) {
       throw new Error(`Failed to fetch webhook event: ${response.statusText}`);
     }
 

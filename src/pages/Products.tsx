@@ -13,7 +13,7 @@ export function Products() {
   const [itemsPerPage, setItemsPerPage] = useState<number>(50);
   const [cursor, setCursor] = useState<string | null>(null);
   const [cursorHistory, setCursorHistory] = useState<string[]>([]); // Track cursor history for back navigation
-  const [startIndex, setStartIndex] = useState<number>(1); // Track starting index (1-based) for range display
+  const [currentPage, setCurrentPage] = useState<number>(1); // Track current page number (1-based)
   const [containerHeight, setContainerHeight] = useState<number>(600); // Default height in pixels
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -30,7 +30,7 @@ export function Products() {
   const handleRefresh = async () => {
     setCursor(null);
     setCursorHistory([]);
-    setStartIndex(1);
+    setCurrentPage(1);
     await refresh();
   };
 
@@ -38,15 +38,14 @@ export function Products() {
     setItemsPerPage(value);
     setCursor(null);
     setCursorHistory([]);
-    setStartIndex(1);
+    setCurrentPage(1);
   };
 
   const handleNextPage = () => {
     if (pageInfo.hasNextPage && pageInfo.endCursor) {
       setCursorHistory([...cursorHistory, cursor || '']);
       setCursor(pageInfo.endCursor);
-      // Update startIndex based on current page size
-      setStartIndex(startIndex + itemsPerPage);
+      setCurrentPage(prev => prev + 1);
     }
   };
 
@@ -56,19 +55,26 @@ export function Products() {
       const previousCursor = newHistory.pop() || null;
       setCursorHistory(newHistory);
       setCursor(previousCursor);
-      setStartIndex(Math.max(1, startIndex - itemsPerPage));
+      setCurrentPage(prev => Math.max(1, prev - 1));
     } else {
       setCursor(null);
-      setStartIndex(1);
+      setCurrentPage(1);
     }
   };
 
-  // Sync startIndex when cursor changes to null (first page)
+  // Sync currentPage when cursor changes to null (first page) or when totalCount changes
   useEffect(() => {
     if (cursor === null) {
-      setStartIndex(1);
+      setCurrentPage(1);
     }
-  }, [cursor]);
+    // If currentPage would exceed max pages, reset to page 1
+    const maxPage = totalCount > 0 ? Math.ceil(totalCount / itemsPerPage) : 1;
+    if (currentPage > maxPage) {
+      setCurrentPage(1);
+      setCursor(null);
+      setCursorHistory([]);
+    }
+  }, [cursor, totalCount, itemsPerPage, currentPage]);
 
   // Handle resize drag
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -110,10 +116,52 @@ export function Products() {
   const canGoPrevious = cursorHistory.length > 0 || cursor !== null;
 
   // Calculate the range for display (e.g., "1-50 of 223")
-  const endIndex = Math.min(startIndex + products.length - 1, totalCount);
-  const rangeText = products.length > 0 
-    ? `Showing ${startIndex}-${endIndex} of ${totalCount} products`
-    : `Showing 0 of ${totalCount} products`;
+  // For cursor-based pagination, we can only reliably calculate range on first page
+  let rangeText = '';
+  
+  // Debug logging for all cases
+  console.log('Pagination Debug (All):', {
+    cursor: cursor ? 'exists' : 'null',
+    cursorHistoryLength: cursorHistory.length,
+    currentPage,
+    productsLength: products.length,
+    totalCount,
+    itemsPerPage
+  });
+  
+  if (products.length > 0 && totalCount > 0) {
+    if (cursor === null) {
+      // First page: always starts at 1
+      const endIndex = Math.min(products.length, totalCount);
+      rangeText = `Showing 1-${endIndex} of ${totalCount} products`;
+      console.log('First page calculation:', { endIndex, rangeText });
+    } else {
+      // Subsequent pages: calculate based on cursorHistory
+      // When cursor !== null, we're on page (cursorHistory.length + 1)
+      // Because handleNextPage adds current cursor to history before setting new cursor
+      const pageNumber = cursorHistory.length + 1;
+      const startIndex = ((pageNumber - 1) * itemsPerPage) + 1;
+      const endIndex = Math.min(startIndex + products.length - 1, totalCount);
+      
+      console.log('Subsequent page calculation:', {
+        pageNumber,
+        startIndex,
+        endIndex,
+        willShowRange: startIndex <= totalCount && startIndex <= endIndex
+      });
+      
+      // Safety check: ensure startIndex doesn't exceed totalCount
+      if (startIndex <= totalCount && startIndex <= endIndex) {
+        rangeText = `Showing ${startIndex}-${endIndex} of ${totalCount} products`;
+      } else {
+        // Fallback: just show count if calculation is invalid
+        rangeText = `Showing ${products.length} of ${totalCount} products`;
+        console.log('Using fallback - calculation invalid');
+      }
+    }
+  } else {
+    rangeText = `Showing 0 of ${totalCount} products`;
+  }
 
   const loading = statsLoading || productsLoading;
   const error = statsError || productsError;
