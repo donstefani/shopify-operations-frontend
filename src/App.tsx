@@ -4,7 +4,7 @@ import { NotificationContainer } from './components/notifications/NotificationCo
 
 function App() {
   return (
-    <BrowserRouter basename="/portfolio/shopify-operations">
+    <BrowserRouter basename="/portfolio/shopify-operations/">
       <AppRoutes />
       <NotificationContainer />
     </BrowserRouter>
